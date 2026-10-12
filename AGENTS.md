@@ -142,12 +142,17 @@ Notes:
 
 ```bash
 silk site {NETID}.w3.uvm.edu update
-silk app {NETID}.w3.uvm.edu load
+silk app {NETID}.w3.uvm.edu/* load
 ```
 
+**App locator gotcha:** `silk app HOST load` looks up `HOST/` and fails with
+`No app found at HOST/` when the app’s `uri = /*`. Always pass the uri pattern:
+`silk app HOST/* load` (or `HOST/myapp*` for a path-scoped app). See
+[Silk Node.js docs](https://silk.uvm.edu/manual/nodejs/).
+
 Stale Node/Unit workers can linger after bad deploys. If the site serves old
-code or wedged processes, kill the account’s stale Node workers and `silk app
-… load` again.
+code or wedged processes, kill the account’s stale Node workers and
+`silk app HOST/* load` again.
 
 ## Proxy / CORS / path conventions
 

@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 from silk_sidecar.config import ConfigError, load_config, default_init_config, write_init_config
 from silk_sidecar.frontend_ini import merge_ini, render_full_ini
 from silk_sidecar.next_rewrite import render_snippet
+from silk_sidecar.silk_cmd import app_target
 from silk_sidecar.systemd_unit import render_unit
 
 
@@ -98,6 +99,20 @@ startup-script = server.js
             snip = render_snippet(cfg)
             self.assertIn("127.0.0.1:9000", snip)
             self.assertIn("/api/:path*", snip)
+
+    def test_app_target_includes_uri_star(self) -> None:
+        self.assertEqual(
+            app_target("ljlevine.w3.uvm.edu", "/*"),
+            "ljlevine.w3.uvm.edu/*",
+        )
+        self.assertEqual(
+            app_target("ljlevine.w3.uvm.edu/", "/myapp*"),
+            "ljlevine.w3.uvm.edu/myapp*",
+        )
+        self.assertEqual(
+            app_target("host.example", "api*"),
+            "host.example/api*",
+        )
 
     def test_hello_example_config_shape(self) -> None:
         """Hello example generates silk-sidecar.json via setup.sh; validate shape here."""

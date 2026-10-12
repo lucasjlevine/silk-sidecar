@@ -96,7 +96,7 @@ If that fails, linger is off: `loginctl enable-linger "$USER"`.
 | `doctor` | Linger, unit, port, health, `.silk.ini`, `silk` CLI |
 | `frontend write-ini` | Merge-aware `.silk.ini` writer |
 | `frontend rewrite-snippet` | Next.js rewrite helper for `/api` → localhost |
-| `frontend load` | `silk site HOST update` + `silk app HOST load` |
+| `frontend load` | `silk site HOST update` + `silk app HOST/* load` |
 | `deploy` | Optional build + `up` + write-ini + load |
 
 ## Frontend proxy contract

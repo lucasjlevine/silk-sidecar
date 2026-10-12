@@ -51,12 +51,26 @@ def run_silk(*args: str, check: bool = False) -> SilkResult:
 
 
 def site_update(host: str) -> SilkResult:
-    return run_silk("site", host, "update")
+    return run_silk("site", host.rstrip("/"), "update")
 
 
-def app_load(host: str) -> SilkResult:
-    return run_silk("app", host, "load")
+def app_target(host: str, uri: str = "/*") -> str:
+    """Silk app locator: hostname + uri pattern (e.g. host/*).
+
+    ``silk app HOST load`` looks up ``HOST/`` and misses apps whose
+    ``.silk.ini`` uri is ``/*``. Pass ``HOST/*`` instead.
+    See https://silk.uvm.edu/manual/nodejs/
+    """
+    host = host.rstrip("/")
+    uri = (uri or "/*").strip()
+    if not uri.startswith("/"):
+        uri = f"/{uri}"
+    return f"{host}{uri}"
 
 
-def frontend_load(host: str) -> list[SilkResult]:
-    return [site_update(host), app_load(host)]
+def app_load(host: str, uri: str = "/*") -> SilkResult:
+    return run_silk("app", app_target(host, uri), "load")
+
+
+def frontend_load(host: str, uri: str = "/*") -> list[SilkResult]:
+    return [site_update(host), app_load(host, uri)]

@@ -22,7 +22,7 @@ from silk_sidecar.health import probe_url
 from silk_sidecar.linger import enable_linger, show_linger
 from silk_sidecar.next_rewrite import render_snippet, write_snippet
 from silk_sidecar.registry import load_registry, register_app, unregister_app
-from silk_sidecar.silk_cmd import frontend_load, silk_available
+from silk_sidecar.silk_cmd import app_target, frontend_load, silk_available
 from silk_sidecar.systemd_unit import (
     copy_unit_to_project,
     enable_and_start,
@@ -268,7 +268,10 @@ def cmd_frontend_load(args: argparse.Namespace) -> int:
             "silk CLI not found on PATH. Backend commands still work; "
             "frontend load must run on a Silk host."
         )
-    results = frontend_load(cfg.host)
+    uri = cfg.frontend.uri if cfg.frontend else "/*"
+    target = app_target(cfg.host, uri)
+    print(f"==> silk app {target} load")
+    results = frontend_load(cfg.host, uri)
     code = 0
     for r in results:
         label = " ".join(r.command)
@@ -280,6 +283,11 @@ def cmd_frontend_load(args: argparse.Namespace) -> int:
             code = 1
             print(f"FAIL {label}", file=sys.stderr)
             print((r.stderr or r.stdout).rstrip(), file=sys.stderr)
+            if "No app found" in (r.stderr or r.stdout or "") and not target.endswith("*"):
+                print(
+                    f"hint: Silk addresses apps as host+uri; try: silk app {cfg.host}/* load",
+                    file=sys.stderr,
+                )
     return code
 
 
