@@ -1,0 +1,14 @@
+[Unit]
+Description=$description
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$workdir
+$environment_block
+ExecStart=$exec_start
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

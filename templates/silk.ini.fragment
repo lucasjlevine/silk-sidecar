@@ -1,0 +1,9 @@
+[app: web]
+type = nodejs
+root = APP_ROOT
+uri = /*
+document-root = public
+startup-script = server.js
+env.NODE_ENV = production
+env.HOSTNAME = 127.0.0.1
+env.PORT = 3000

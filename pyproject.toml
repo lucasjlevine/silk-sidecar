@@ -1,0 +1,13 @@
+[project]
+name = "silk-sidecar"
+version = "0.1.0"
+description = "CLI for durable localhost backends on UVM Silk, wired to Unit frontends"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[project.scripts]
+silk-sidecar = "silk_sidecar.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["silk_sidecar*"]

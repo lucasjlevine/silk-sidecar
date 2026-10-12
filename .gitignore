@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.DS_Store
+silk-sidecar
+*.rewrites.js
+systemd/
+.pytest_cache/
+examples/hello/silk-sidecar.json
+examples/hello/dist/
+examples/hello/site/

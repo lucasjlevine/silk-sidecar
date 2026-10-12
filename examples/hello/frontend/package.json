@@ -1,0 +1,14 @@
+{
+  "name": "silk-sidecar-hello-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Minimal Node front-end that proxies /api to a localhost FastAPI sidecar",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "API_UPSTREAM=http://127.0.0.1:8765 PORT=3000 node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
