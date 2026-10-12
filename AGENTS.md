@@ -150,9 +150,17 @@ silk app {NETID}.w3.uvm.edu/* load
 `silk app HOST/* load` (or `HOST/myapp*` for a path-scoped app). See
 [Silk Node.js docs](https://silk.uvm.edu/manual/nodejs/).
 
-Stale Node/Unit workers can linger after bad deploys. If the site serves old
-code or wedged processes, kill the account’s stale Node workers and
-`silk app HOST/* load` again.
+**Stale Node workers:** Unit often keeps old `node server.js` processes after
+`.silk.ini` / dist changes. Symptoms: site still serves an old app, wrong
+env, or 502 while a new config exists on disk. Always kill then reload:
+
+```bash
+silk-sidecar frontend kill-stale --config ./silk-sidecar.json   # or --broad
+silk-sidecar frontend load --config ./silk-sidecar.json
+# deploy/load do this kill step by default (--keep-stale to skip)
+```
+
+Do **not** kill the systemd backend (uvicorn); only Unit Node workers.
 
 ## Proxy / CORS / path conventions
 

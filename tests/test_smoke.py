@@ -16,6 +16,7 @@ from silk_sidecar.config import ConfigError, load_config, default_init_config, w
 from silk_sidecar.frontend_ini import merge_ini, render_full_ini
 from silk_sidecar.next_rewrite import render_snippet
 from silk_sidecar.silk_cmd import app_target
+from silk_sidecar.stale import match_patterns_for
 from silk_sidecar.systemd_unit import render_unit
 
 
@@ -99,6 +100,19 @@ startup-script = server.js
             snip = render_snippet(cfg)
             self.assertIn("127.0.0.1:9000", snip)
             self.assertIn("/api/:path*", snip)
+
+    def test_stale_match_patterns_include_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "silk-sidecar.json"
+            data = default_init_config(name="demo", netid="alice", port=8000)
+            data["backend"]["workdir"] = tmp
+            data["frontend"]["root"] = "silk-hello/dist/web"
+            data["frontend"]["startup_script"] = "server.js"
+            write_init_config(path, data)
+            cfg = load_config(path)
+            pats = match_patterns_for(cfg)
+            self.assertIn("silk-hello/dist/web/server.js", pats)
+            self.assertIn("server.js", pats)
 
     def test_app_target_includes_uri_star(self) -> None:
         self.assertEqual(

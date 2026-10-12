@@ -23,6 +23,12 @@ from silk_sidecar.linger import enable_linger, show_linger
 from silk_sidecar.next_rewrite import render_snippet, write_snippet
 from silk_sidecar.registry import load_registry, register_app, unregister_app
 from silk_sidecar.silk_cmd import app_target, frontend_load, silk_available
+from silk_sidecar.stale import (
+    find_stale,
+    format_procs,
+    kill_stale,
+    list_user_node_procs,
+)
 from silk_sidecar.systemd_unit import (
     copy_unit_to_project,
     enable_and_start,
@@ -261,6 +267,51 @@ def cmd_frontend_rewrite_snippet(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_kill_stale(
+    cfg,
+    *,
+    broad: bool = False,
+    dry_run: bool = False,
+) -> int:
+    if dry_run:
+        matched = find_stale(cfg, broad=broad)
+        print("==> stale Node/Unit workers (dry-run, not killed):")
+        print(format_procs(matched))
+        all_procs = list_user_node_procs()
+        if all_procs and not matched:
+            print("==> other node processes for this user:")
+            print(format_procs(all_procs))
+        return 0
+
+    print("==> kill stale Node/Unit workers" + (" (broad)" if broad else ""))
+    before = find_stale(cfg, broad=broad)
+    if not before:
+        print("(none matched)")
+        extras = list_user_node_procs()
+        if extras:
+            print("other node processes still present (not matched):")
+            print(format_procs(extras))
+        return 0
+
+    print(format_procs(before))
+    report = kill_stale(cfg, broad=broad, dry_run=False)
+    if report.term_sent:
+        print(f"==> SIGTERM: {', '.join(str(p) for p in report.term_sent)}")
+    if report.kill_sent:
+        print(f"==> SIGKILL: {', '.join(str(p) for p in report.kill_sent)}")
+    if report.still_running:
+        print("warning: still running after kill:", file=sys.stderr)
+        print(format_procs(report.still_running), file=sys.stderr)
+        return 1
+    print("==> stale workers cleared")
+    return 0
+
+
+def cmd_frontend_kill_stale(args: argparse.Namespace) -> int:
+    cfg = _load(args.config)
+    return _run_kill_stale(cfg, broad=args.broad, dry_run=args.dry_run)
+
+
 def cmd_frontend_load(args: argparse.Namespace) -> int:
     cfg = _load(args.config)
     if not silk_available():
@@ -268,8 +319,21 @@ def cmd_frontend_load(args: argparse.Namespace) -> int:
             "silk CLI not found on PATH. Backend commands still work; "
             "frontend load must run on a Silk host."
         )
+
+    keep_stale = getattr(args, "keep_stale", False)
+    broad = getattr(args, "broad_kill", False)
+    if not keep_stale:
+        # Unit often keeps old Node workers alive; kill then reload.
+        rc_kill = _run_kill_stale(cfg, broad=broad, dry_run=False)
+        if rc_kill != 0:
+            print(
+                "warning: some workers survived kill; continuing with load…",
+                file=sys.stderr,
+            )
+
     uri = cfg.frontend.uri if cfg.frontend else "/*"
     target = app_target(cfg.host, uri)
+    print(f"==> silk site {cfg.host} update")
     print(f"==> silk app {target} load")
     results = frontend_load(cfg.host, uri)
     code = 0
@@ -286,6 +350,27 @@ def cmd_frontend_load(args: argparse.Namespace) -> int:
             if "No app found" in (r.stderr or r.stdout or "") and not target.endswith("*"):
                 print(
                     f"hint: Silk addresses apps as host+uri; try: silk app {cfg.host}/* load",
+                    file=sys.stderr,
+                )
+    if code == 0 and not keep_stale:
+        # Second pass: Unit may have respawned from old config before update.
+        leftover = find_stale(cfg, broad=broad)
+        # After a successful load, new workers are expected — only warn if
+        # argv still points at a path that is not the configured root.
+        if cfg.frontend and leftover:
+            root = cfg.frontend.root.strip("/")
+            startup = cfg.frontend.startup_script or "server.js"
+            expected_frag = f"{root}/{startup}" if root else startup
+            weird = [p for p in leftover if expected_frag not in p.args and root not in p.args]
+            if weird:
+                print(
+                    "warning: unexpected node workers still running after load:",
+                    file=sys.stderr,
+                )
+                print(format_procs(weird), file=sys.stderr)
+                print(
+                    "hint: silk-sidecar frontend kill-stale --broad && "
+                    "silk-sidecar frontend load",
                     file=sys.stderr,
                 )
     return code
@@ -322,7 +407,11 @@ def cmd_deploy(args: argparse.Namespace) -> int:
         write_ini(cfg, merge=not args.replace_ini)
         if not args.skip_load:
             print("==> frontend load")
-            load_ns = argparse.Namespace(config=str(cfg.config_path))
+            load_ns = argparse.Namespace(
+                config=str(cfg.config_path),
+                keep_stale=args.keep_stale,
+                broad_kill=args.broad_kill,
+            )
             rc_load = cmd_frontend_load(load_ns)
             if rc_load != 0:
                 return rc_load
@@ -412,8 +501,38 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("-o", "--output", default=None)
     s.set_defaults(func=cmd_frontend_rewrite_snippet)
 
-    s = fe_sub.add_parser("load", help="silk site update + silk app load")
+    s = fe_sub.add_parser(
+        "kill-stale",
+        help="Kill stale Unit Node workers for this app (does not load)",
+    )
     s.add_argument("--config", default=None)
+    s.add_argument(
+        "--broad",
+        action="store_true",
+        help="Match any node process for this user (stronger cleanup)",
+    )
+    s.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List matches without killing",
+    )
+    s.set_defaults(func=cmd_frontend_kill_stale)
+
+    s = fe_sub.add_parser(
+        "load",
+        help="Kill stale workers, then silk site update + silk app HOST/* load",
+    )
+    s.add_argument("--config", default=None)
+    s.add_argument(
+        "--keep-stale",
+        action="store_true",
+        help="Do not kill existing Node workers before load",
+    )
+    s.add_argument(
+        "--broad-kill",
+        action="store_true",
+        help="When killing stale workers, match any user node process",
+    )
     s.set_defaults(func=cmd_frontend_load)
 
     # deploy
@@ -422,6 +541,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--skip-build", action="store_true")
     s.add_argument("--skip-load", action="store_true")
     s.add_argument("--skip-linger", action="store_true")
+    s.add_argument("--keep-stale", action="store_true")
+    s.add_argument("--broad-kill", action="store_true")
     s.add_argument("--replace-ini", action="store_true")
     s.add_argument("--allow-unhealthy", action="store_true")
     s.add_argument("--retries", type=int, default=8)

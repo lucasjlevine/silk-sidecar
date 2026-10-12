@@ -28,8 +28,13 @@ cd examples/hello
 ./setup.sh
 silk-sidecar linger enable
 silk-sidecar deploy --config ./silk-sidecar.json
+# If the site still shows an old Node app:
+#   silk-sidecar frontend kill-stale --broad --config ./silk-sidecar.json
+#   silk-sidecar frontend load --config ./silk-sidecar.json
 silk-sidecar doctor --config ./silk-sidecar.json
 ```
+
+`deploy` / `frontend load` kill matching Unit Node workers before reload by default.
 
 Then open `https://YOUR_NETID.w3.uvm.edu/`, click the button, log out of SSH, and confirm:
 

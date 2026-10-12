@@ -10,6 +10,7 @@ from silk_sidecar.frontend_ini import silk_ini_path
 from silk_sidecar.health import port_open, probe_url
 from silk_sidecar.linger import show_linger
 from silk_sidecar.silk_cmd import silk_available
+from silk_sidecar.stale import find_stale, list_user_node_procs
 from silk_sidecar.systemd_unit import unit_is_active, unit_path
 
 
@@ -145,6 +146,37 @@ def run_doctor(cfg: AppConfig) -> list[Check]:
             required_for_ready=False,
         )
     )
+
+    if cfg.frontend:
+        try:
+            stale = find_stale(cfg, broad=False)
+            node_all = list_user_node_procs()
+            if stale:
+                detail = (
+                    f"{len(stale)} matched worker(s) — "
+                    "run: silk-sidecar frontend kill-stale && frontend load"
+                )
+            elif node_all:
+                detail = f"{len(node_all)} node process(es) present (none matched app root)"
+            else:
+                detail = "no user node workers listed"
+            checks.append(
+                Check(
+                    name="stale-node",
+                    ok=len(stale) == 0,
+                    detail=detail,
+                    required_for_ready=False,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            checks.append(
+                Check(
+                    name="stale-node",
+                    ok=True,
+                    detail=f"skipped ({exc})",
+                    required_for_ready=False,
+                )
+            )
 
     return checks
 
