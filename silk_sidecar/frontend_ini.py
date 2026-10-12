@@ -15,6 +15,26 @@ def silk_ini_path(cfg: AppConfig) -> Path:
     return cfg.site_root / ".silk.ini"
 
 
+def app_document_root_path(cfg: AppConfig) -> Path | None:
+    """Absolute path Silk validates: site_root / frontend.root / document-root."""
+    if not cfg.frontend:
+        return None
+    doc = cfg.frontend.document_root or "public"
+    return (cfg.site_root / cfg.frontend.root / doc).resolve()
+
+
+def ensure_document_root(cfg: AppConfig) -> Path | None:
+    """Create the app document-root directory if missing (Silk requires it)."""
+    path = app_document_root_path(cfg)
+    if path is None:
+        return None
+    path.mkdir(parents=True, exist_ok=True)
+    keep = path / ".keep"
+    if not any(path.iterdir()):
+        keep.write_text("", encoding="utf-8")
+    return path
+
+
 def render_app_stanza(frontend: FrontendConfig, *, document_root_general: str = "public") -> str:
     env = {
         "NODE_ENV": "production",
@@ -167,6 +187,13 @@ def merge_ini(existing: str, cfg: AppConfig) -> str:
 def write_ini(cfg: AppConfig, *, merge: bool = True) -> Path:
     path = silk_ini_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Silk validates document-root under the app root and fails load if missing.
+    ensure_document_root(cfg)
+    # Also ensure site-level public/ used by [general] document-root
+    if cfg.frontend:
+        (cfg.site_root / (cfg.frontend.document_root or "public")).mkdir(
+            parents=True, exist_ok=True
+        )
     if merge and path.is_file():
         text = merge_ini(path.read_text(encoding="utf-8"), cfg)
     else:

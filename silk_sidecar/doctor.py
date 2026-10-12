@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from silk_sidecar.config import AppConfig
-from silk_sidecar.frontend_ini import silk_ini_path
+from silk_sidecar.frontend_ini import app_document_root_path, silk_ini_path
 from silk_sidecar.health import port_open, probe_url
 from silk_sidecar.linger import show_linger
 from silk_sidecar.silk_cmd import silk_available
@@ -133,6 +133,19 @@ def run_doctor(cfg: AppConfig) -> list[Check]:
                     str(startup)
                     if startup.is_file()
                     else f"missing {startup} (build frontend first)"
+                ),
+                required_for_ready=False,
+            )
+        )
+        doc = app_document_root_path(cfg)
+        checks.append(
+            Check(
+                name="document-root",
+                ok=bool(doc and doc.is_dir()),
+                detail=(
+                    str(doc)
+                    if doc and doc.is_dir()
+                    else f"missing {doc} (Silk requires it; run frontend write-ini / build)"
                 ),
                 required_for_ready=False,
             )

@@ -11,7 +11,13 @@ cp "$ROOT/frontend/server.js" "$OUT/server.js"
 cp "$ROOT/frontend/package.json" "$OUT/package.json"
 chmod u+x "$OUT/server.js"
 
-# Ensure public docroot exists for .silk.ini document-root
-mkdir -p "$ROOT/dist/public"
+# Silk requires document-root under the app root (relative to frontend.root).
+# With document-root = public → …/dist/web/public must exist.
+if [[ -d "$ROOT/frontend/public" ]]; then
+  cp -R "$ROOT/frontend/public" "$OUT/public"
+else
+  mkdir -p "$OUT/public"
+fi
+: >"$OUT/public/.keep"
 
-echo "Built $OUT"
+echo "Built $OUT (with public/)"

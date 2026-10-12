@@ -135,6 +135,11 @@ Notes:
 
 - `root` is relative to the site root (`~/www-root`), not the git repo, unless
   you deliberately structure it that way.
+- **`document-root` must exist on disk** under the app root. Silk resolves it as
+  `{site_root}/{app.root}/{document-root}/` and **fails `silk app … load`** if
+  that directory is missing (error: “Public, static files located under … does
+  not exist”). Create e.g. `dist/web/public/` even if empty. `frontend write-ini`
+  / `frontend load` call `ensure_document_root` for you.
 - Unit does **not** reverse-proxy to your localhost backend by itself.
 - The Node process must proxy/rewrite `/api` → `http://127.0.0.1:{PORT}`.
 - Pass upstream via `env.API_UPSTREAM` (or bake rewrites at build time).

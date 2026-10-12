@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from silk_sidecar.config import ConfigError, load_config, default_init_config, write_init_config
-from silk_sidecar.frontend_ini import merge_ini, render_full_ini
+from silk_sidecar.frontend_ini import ensure_document_root, merge_ini, render_full_ini
 from silk_sidecar.next_rewrite import render_snippet
 from silk_sidecar.silk_cmd import app_target
 from silk_sidecar.stale import match_patterns_for
@@ -100,6 +100,24 @@ startup-script = server.js
             snip = render_snippet(cfg)
             self.assertIn("127.0.0.1:9000", snip)
             self.assertIn("/api/:path*", snip)
+
+    def test_ensure_document_root_creates_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            app_root = tmp_path / "hello" / "dist" / "web"
+            app_root.mkdir(parents=True)
+            data = default_init_config(name="demo", netid="alice", port=8000)
+            data["site_root"] = str(tmp_path)
+            data["backend"]["workdir"] = str(tmp_path)
+            data["frontend"]["root"] = "hello/dist/web"
+            data["frontend"]["document_root"] = "public"
+            path = tmp_path / "silk-sidecar.json"
+            write_init_config(path, data)
+            cfg = load_config(path)
+            doc = ensure_document_root(cfg)
+            assert doc is not None
+            self.assertTrue(doc.is_dir())
+            self.assertEqual(doc, (app_root / "public").resolve())
 
     def test_stale_match_patterns_include_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

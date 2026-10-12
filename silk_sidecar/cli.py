@@ -17,7 +17,7 @@ from silk_sidecar.config import (
     write_init_config,
 )
 from silk_sidecar.doctor import format_doctor_report, run_doctor
-from silk_sidecar.frontend_ini import write_ini
+from silk_sidecar.frontend_ini import ensure_document_root, write_ini
 from silk_sidecar.health import probe_url
 from silk_sidecar.linger import enable_linger, show_linger
 from silk_sidecar.next_rewrite import render_snippet, write_snippet
@@ -249,7 +249,10 @@ def cmd_frontend_write_ini(args: argparse.Namespace) -> int:
     if not cfg.frontend:
         _die("config has no frontend section")
     path = write_ini(cfg, merge=not args.replace)
+    doc = ensure_document_root(cfg)
     print(f"Wrote {path}" + (" (replace)" if args.replace else " (merge)"))
+    if doc:
+        print(f"Ensured document-root: {doc}")
     return 0
 
 
@@ -319,6 +322,11 @@ def cmd_frontend_load(args: argparse.Namespace) -> int:
             "silk CLI not found on PATH. Backend commands still work; "
             "frontend load must run on a Silk host."
         )
+
+    # Silk rejects apps whose document-root directory is missing.
+    doc = ensure_document_root(cfg)
+    if doc:
+        print(f"==> document-root: {doc}")
 
     keep_stale = getattr(args, "keep_stale", False)
     broad = getattr(args, "broad_kill", False)
